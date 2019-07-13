@@ -1,5 +1,22 @@
-udev-media-automount
-====================
+# udev-media-automount
+
+## Forked
+
+from [Ferk/udev-media-automount](https://github.com/ferk/udev-media-automount)
+
+inspired by [seankhliao/udev-media-automount](https://github.com/seankhliao/udev-media-automount)
+
+changes:
+
+- use bash
+- limit scope to usb
+- use uuid in mount destination name
+- removed `umount_dmenu`
+- changed install file perms
+- add clean
+- fix issues with mount options
+
+## Orginal Description
 
 Auto mount removable media devices by means of udev rules.
 

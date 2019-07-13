@@ -1,10 +1,10 @@
-#!/bin/sh
+#!/bin/bash
 #$1 = <dev>
 
 # Directory to use for mounting the devices
 mdir=/media/
 # Default options to use for mounting
-mopts='errors=remount-ro,relatime,utf8,user'
+mopts='errors=remount-ro,relatime,user'
 
 [[ $EUID != 0 ]] && {
     echo "This tool requires root permissions"
@@ -21,37 +21,40 @@ then
     log "missing arguments! a device name must be provided"
     exit 1
 else
-    dev=/dev/${1##*/}  
+    dev=/dev/${1##*/}
+    # Load additional info for the block device
+    eval $(blkid -po export $dev)
 fi
 
+# directory name
+dir="${mdir}${UUID}"
+
 # Check if the device exists, if not but mounted, umount it
-if ! [ -b $dev ]
+if ! blkid | grep -qe "^$dev"
 then
     if grep /etc/mtab -qe "^$dev"
     then
-	log "$dev device removed, umounting and cleaning /media"
-	if umount "$dev"
-	then
-	    exitcode=0
-	else
-	    log "Error umounting $dev errcode:$?"
-	    exitcode=$?
-	fi
+        log "$dev device removed, umounting and cleaning /media"
+        dir=$(findmnt -m -S $dev -o TARGET -n)
+    if umount "$dir"
+    then
+        exitcode=0
     else
-	log "device doesn't exist anymore or is not a block device: $dev"
-	exitcode=1
+        log "Error umounting $dev errcode:$?"
+        exitcode=$?
+    fi
+    else
+        log "device doesn't exist anymore or is not a block device: $dev"
+        exitcode=1
     fi
 
     # cleanup
     for dir in "$mdir"/*
     do
-	[ -d "$dir" ] && ! mountpoint -q "$dir" && rmdir "$dir"
+    [ -d "$dir" ] && ! mountpoint -q "$dir" && rmdir "$dir"
     done
     exit $exitcode
 fi
-
-# Load additional info for the block device
-eval $(blkid -po export $dev)
 
 # Check /etc/fstab for an entry corresponding to the device
 [ "$UUID" ] && fstab=$(grep /etc/fstab -e "${UUID/\-/\\\-}") || \
@@ -65,20 +68,24 @@ then
     exit 1
 fi
 
-# directory name
-dir="${mdir}/${LABEL:-${dev##*/}}.$TYPE"
+# Don't try to mount if the destination is already a mount point
+if mountpoint -q "$dir"
+then
+    log "$dev already mounted in $dir"
+    exit 1
+fi
 
 case $TYPE in
     vfat)
-	mopts="$mopts,flush,gid=100,dmask=000,fmask=111"
-	;;
+    mopts="$mopts,flush,gid=100,dmask=000,fmask=111"
+    ;;
     ntfs)
-	mopts="$mopts,flush"
-	hash ntfs-3g && mtype="ntfs-3g"
-	;;
+    mopts="$mopts"
+    hash ntfs-3g && mtype="ntfs-3g"
+    ;;
     *)
-	mopts="$mopts,sync"
-	;;
+    mopts="$mopts,sync"
+    ;;
 esac
 
 log "mounting device $dev in $dir"
