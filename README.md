@@ -15,6 +15,7 @@ changes:
 - changed install file perms
 - add clean
 - fix issues with mount options
+- create block files if missing (useful with docker)
 
 ## Orginal Description
 

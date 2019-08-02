@@ -21,7 +21,19 @@ then
     log "missing arguments! a device name must be provided"
     exit 1
 else
-    dev=/dev/${1##*/}
+    blk=${1##*/}
+    dev=/dev/$blk
+    # Check if the device exists but the block file is missing
+    # Useful in docker
+    if ! [ -b $dev ] && lsblk -nr | grep -q "$blk "
+    then
+        # Create the block file
+        blknum=$(lsblk -o KNAME,MAJ:MIN -nr | grep "$blk " | cut -f2 -d' ')
+        blkmaj=$(echo $blknum | cut -f1 -d:)
+        blkmin=$(echo $blknum | cut -f2 -d:)
+        mknod $dev b $blkmaj $blkmin
+    fi
+
     # Load additional info for the block device
     eval $(blkid -po export $dev)
 fi
